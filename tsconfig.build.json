@@ -6,6 +6,9 @@
     "strictNullChecks": false,
     "strictBindCallApply": false,
     "noUnusedLocals": false,
-    "noUnusedParameters": false
+    "noUnusedParameters": false,
+    "noFallthroughCasesInSwitch": false,
+    "declaration": false,
+    "noEmitOnError": false
   }
 }

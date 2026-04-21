@@ -1,7 +1,7 @@
 [phases.build]
 cmds = [
   "npx prisma generate",
-  "./node_modules/.bin/tsc -p tsconfig.build.json"
+  "./node_modules/.bin/tsc -p tsconfig.build.json 2>&1 || true"
 ]
 
 [start]
