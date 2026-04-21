@@ -244,18 +244,8 @@ model TradeCard {
   condition   Condition @default(nm)
   side        String                             // 'offered' | 'requested'
 
-  offer TradeOffer @relation(
-    name: "OfferedCards",
-    fields: [offerId],
-    references: [id],
-    map: "trade_card_offered_fk"
-  )
-  offerRequested TradeOffer @relation(
-    name: "RequestedCards",
-    fields: [offerId],
-    references: [id],
-    map: "trade_card_requested_fk"
-  )
+  offer          TradeOffer @relation(name: "OfferedCards",   fields: [offerId], references: [id], map: "trade_card_offered_fk")
+  offerRequested TradeOffer @relation(name: "RequestedCards", fields: [offerId], references: [id], map: "trade_card_requested_fk")
   card Card @relation("OfferedCard", fields: [cardId], references: [id])
 
   @@index([offerId])
