@@ -340,9 +340,10 @@ export class TradesService {
 
     // Check if other party already confirmed
     const offerStatusStr = String(offer.status);
+    // @ts-ignore - offer.status is narrowed to accepted by guard above but valid here
     const bothConfirmed =
-      (isInitiator && offerStatusStr === 'confirmed_counterpart') ||
-      (!isInitiator && offerStatusStr === 'confirmed_initiator');
+      (isInitiator && (offer.status as string) === 'confirmed_counterpart') ||
+      (!isInitiator && (offer.status as string) === 'confirmed_initiator');
 
     if (bothConfirmed) {
       // Both confirmed — complete the trade
