@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "npx prisma generate && npm run build:nest"
+buildCommand = "echo 'Cache bust v4' && npx prisma generate && npm run build:nest"
 
 [deploy]
 startCommand = "npm run start"
