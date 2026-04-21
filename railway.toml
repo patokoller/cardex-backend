@@ -1,6 +1,6 @@
 [build]
 builder = "NIXPACKS"
-buildCommand = "echo 'Cache bust v5' && npx prisma generate && ./node_modules/.bin/tsc -p tsconfig.build.json 2>&1 || true"
+buildCommand = "echo 'Cache bust v6' && npx prisma generate && ./node_modules/.bin/tsc -p tsconfig.build.json 2>&1 || true"
 
 [deploy]
 startCommand = "node dist/main"

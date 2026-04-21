@@ -170,7 +170,7 @@ export class TrustService {
 
     return this.prisma.user.update({
       where: { id: userId },
-      data: { repScore: newScore, repTier: newTier as any },
+      data: { repScore: newScore, repTier: newTier as unknown as any },
       select: { repScore: true, repTier: true },
     });
   }
