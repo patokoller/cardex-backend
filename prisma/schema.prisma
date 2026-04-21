@@ -1,0 +1,374 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  extensions = [postgis, pg_trgm, pgcrypto]
+}
+
+// ─────────────────────────────────────────────
+// ENUMS
+// ─────────────────────────────────────────────
+
+enum Game {
+  pokemon
+  dragon_ball
+  one_piece
+}
+
+enum Rarity {
+  common
+  uncommon
+  holo_rare
+  ultra_rare
+  secret_rare
+}
+
+enum Condition {
+  nm   // Near Mint
+  lp   // Light Played
+  mp   // Moderately Played
+  hp   // Heavy Played
+  damaged
+}
+
+enum RepTier {
+  rookie
+  trader
+  verified
+  elite
+}
+
+enum TradeStatus {
+  pending
+  countered
+  accepted
+  confirmed_initiator
+  confirmed_counterpart
+  completed
+  rejected
+  expired
+  disputed
+}
+
+enum TradeType {
+  in_person
+  shipped
+}
+
+enum PriceSource {
+  internal
+  mercadolibre
+  facebook
+  tcgplayer
+}
+
+enum RepEventType {
+  trade_completed
+  on_time_confirmation
+  dispute_raised
+  dispute_resolved
+  peer_rating_positive
+  peer_rating_negative
+  first_trade_bonus
+}
+
+enum NotificationType {
+  match_discovered
+  trade_offer_received
+  trade_countered
+  trade_accepted
+  trade_confirmed
+  trade_completed
+  trade_expired
+  price_alert
+  rep_tier_up
+  id_card_dispatched
+}
+
+// ─────────────────────────────────────────────
+// CARD CATALOG (seeded in Sprint 0, ~2,000 rows)
+// ─────────────────────────────────────────────
+
+model Card {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  setCode     String   @map("set_code")         // e.g. 'BASE-001', 'SWSH1-001'
+  name        String
+  rarity      Rarity
+  setName     String   @map("set_name")
+  setTotal    Int      @map("set_total")
+  imageUrl    String?  @map("image_url")
+  game        Game     @default(pokemon)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  collectionItems CollectionItem[]
+  wishlistItems   WishlistItem[]
+  priceSnapshots  PriceSnapshot[]
+  offeredInTrades TradeCard[]     @relation("OfferedCard")
+
+  @@unique([setCode, game])
+  @@index([name])                  // pg_trgm full-text via raw SQL
+  @@index([game, rarity])
+  @@map("cards")
+}
+
+// ─────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  username         String    @unique
+  phoneHash        String?   @map("phone_hash")   // SHA-256 of normalised phone
+  whatsappOptIn    Boolean   @default(false) @map("whatsapp_opt_in")
+
+  // Location stored as raw WKT — PostGIS queries via $queryRaw
+  latitude         Float?
+  longitude        Float?
+  barrio           String?                          // 'Palermo', 'Almagro', etc.
+
+  repScore         Int       @default(0) @map("rep_score")
+  repTier          RepTier   @default(rookie) @map("rep_tier")
+  idCardSent       Boolean   @default(false) @map("id_card_sent")
+  firstTradeGuaranteeUsed Boolean @default(false) @map("first_trade_guarantee_used")
+
+  // Auth
+  passwordHash     String?   @map("password_hash")
+  refreshTokenHash String?   @map("refresh_token_hash")
+
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @updatedAt @map("updated_at")
+
+  // Relations
+  collectionItems      CollectionItem[]
+  wishlistItems        WishlistItem[]
+  initiatedOffers      TradeOffer[]     @relation("Initiator")
+  counterpartOffers    TradeOffer[]     @relation("Counterpart")
+  initiatedTrades      Trade[]          @relation("TradeInitiator")
+  counterpartTrades    Trade[]          @relation("TradeCounterpart")
+  repEvents            RepEvent[]
+  notifications        Notification[]
+  pushDevices          PushDevice[]
+  connectionsAsA       UserConnection[] @relation("UserA")
+  connectionsAsB       UserConnection[] @relation("UserB")
+
+  @@index([repTier])
+  @@map("users")
+}
+
+// ─────────────────────────────────────────────
+// COLLECTION
+// ─────────────────────────────────────────────
+
+model CollectionItem {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  cardId    String    @map("card_id") @db.Uuid
+  condition Condition @default(nm)
+  quantity  Int       @default(1)
+  forTrade  Int       @default(0) @map("for_trade")  // qty marked tradeable (≤ quantity)
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId, condition])
+  @@index([userId])
+  @@index([forTrade])              // partial index via raw migration
+  @@map("collection_items")
+}
+
+// ─────────────────────────────────────────────
+// WISHLIST
+// ─────────────────────────────────────────────
+
+model WishlistItem {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  cardId      String   @map("card_id") @db.Uuid
+  priority    Int      @default(5)           // 1 (urgent) → 10 (someday)
+  maxCashArs  Decimal? @map("max_cash_ars") @db.Decimal(12, 2)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@unique([userId, cardId])
+  @@index([userId])
+  @@map("wishlist_items")
+}
+
+// ─────────────────────────────────────────────
+// TRADES — offer lifecycle
+// ─────────────────────────────────────────────
+
+model TradeOffer {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  initiatorId    String      @map("initiator_id") @db.Uuid
+  counterpartId  String      @map("counterpart_id") @db.Uuid
+  cashDeltaArs   Decimal     @default(0) @map("cash_delta_ars") @db.Decimal(12, 2)
+  status         TradeStatus @default(pending)
+  expiresAt      DateTime?   @map("expires_at")
+  matchScore     Decimal?    @map("match_score") @db.Decimal(4, 3)
+  parentOfferId  String?     @map("parent_offer_id") @db.Uuid   // counter-offers
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  initiator   User @relation("Initiator",   fields: [initiatorId],   references: [id])
+  counterpart User @relation("Counterpart", fields: [counterpartId], references: [id])
+  parentOffer TradeOffer?  @relation("CounterChain", fields: [parentOfferId], references: [id])
+  counters    TradeOffer[] @relation("CounterChain")
+
+  offeredCards   TradeCard[] @relation("OfferedCards")
+  requestedCards TradeCard[] @relation("RequestedCards")
+  trade          Trade?
+
+  @@index([status])
+  @@index([initiatorId])
+  @@index([counterpartId])
+  @@index([expiresAt])
+  @@map("trade_offers")
+}
+
+// Normalised card line-items for an offer
+model TradeCard {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerId     String    @map("offer_id") @db.Uuid
+  cardId      String    @map("card_id") @db.Uuid
+  quantity    Int       @default(1)
+  condition   Condition @default(nm)
+  side        String                             // 'offered' | 'requested'
+
+  offer TradeOffer @relation(
+    name: "OfferedCards",
+    fields: [offerId],
+    references: [id],
+    map: "trade_card_offered_fk"
+  )
+  offerRequested TradeOffer @relation(
+    name: "RequestedCards",
+    fields: [offerId],
+    references: [id],
+    map: "trade_card_requested_fk"
+  )
+  card Card @relation("OfferedCard", fields: [cardId], references: [id])
+
+  @@index([offerId])
+  @@map("trade_cards")
+}
+
+// Completed trade — permanent record, feeds price oracle
+model Trade {
+  id                 String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  offerId            String     @unique @map("offer_id") @db.Uuid
+  initiatorId        String     @map("initiator_id") @db.Uuid
+  counterpartId      String     @map("counterpart_id") @db.Uuid
+  cashDeltaArs       Decimal?   @map("cash_delta_ars") @db.Decimal(12, 2)
+  tradeType          TradeType? @map("trade_type")
+  initiatorRating    Int?       @map("initiator_rating")    // 1–5
+  counterpartRating  Int?       @map("counterpart_rating")  // 1–5
+  completedAt        DateTime   @default(now()) @map("completed_at")
+
+  offer       TradeOffer @relation(fields: [offerId],       references: [id])
+  initiator   User       @relation("TradeInitiator",   fields: [initiatorId],   references: [id])
+  counterpart User       @relation("TradeCounterpart", fields: [counterpartId], references: [id])
+
+  @@index([completedAt])
+  @@map("trades")
+}
+
+// ─────────────────────────────────────────────
+// PRICING ORACLE
+// ─────────────────────────────────────────────
+
+model PriceSnapshot {
+  id          String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cardId      String      @map("card_id") @db.Uuid
+  condition   Condition   @default(nm)
+  priceArs    Decimal     @map("price_ars") @db.Decimal(12, 2)
+  priceUsdt   Decimal?    @map("price_usdt") @db.Decimal(10, 6)
+  source      PriceSource
+  sourceUrl   String?     @map("source_url")
+  confidence  Decimal?    @db.Decimal(3, 2)   // 0.00–1.00
+  sampleCount Int?        @map("sample_count")
+  snappedAt   DateTime    @default(now()) @map("snapped_at")
+
+  card Card @relation(fields: [cardId], references: [id])
+
+  @@index([cardId, snappedAt(sort: Desc)])
+  @@index([snappedAt])
+  @@map("price_snapshots")
+}
+
+// ─────────────────────────────────────────────
+// REPUTATION
+// ─────────────────────────────────────────────
+
+model RepEvent {
+  id        String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String       @map("user_id") @db.Uuid
+  eventType RepEventType @map("event_type")
+  delta     Int                                  // +25 trade, +10 on_time, -100 dispute
+  refId     String?      @map("ref_id") @db.Uuid
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("rep_events")
+}
+
+// ─────────────────────────────────────────────
+// SOCIAL GRAPH (Conocido de conocido)
+// ─────────────────────────────────────────────
+
+model UserConnection {
+  userAId    String @map("user_a") @db.Uuid
+  userBId    String @map("user_b") @db.Uuid
+  tradeCount Int    @default(1) @map("trade_count")
+
+  userA User @relation("UserA", fields: [userAId], references: [id])
+  userB User @relation("UserB", fields: [userBId], references: [id])
+
+  @@id([userAId, userBId])
+  @@map("user_connections")
+}
+
+// ─────────────────────────────────────────────
+// NOTIFICATIONS
+// ─────────────────────────────────────────────
+
+model Notification {
+  id        String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json?
+  read      Boolean          @default(false)
+  sentAt    DateTime         @default(now()) @map("sent_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, read])
+  @@map("notifications")
+}
+
+model PushDevice {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  token     String   @unique
+  platform  String                     // 'ios' | 'android'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("push_devices")
+}
