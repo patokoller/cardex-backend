@@ -217,7 +217,7 @@ export class CollectionService {
       orderBy: { card: { rarity: 'desc' } },
     });
 
-    return duplicates.map((d) => ({
+    return duplicates.map((d: any) => ({
       itemId: d.id,
       card: {
         id: d.card.id,

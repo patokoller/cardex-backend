@@ -134,7 +134,7 @@ export class PricingService {
     }
 
     // External: IQR outlier rejection
-    const externalPrices = externalSnapshots.map((s) => Number(s.priceArs));
+    const externalPrices = externalSnapshots.map((s: any) => Number(s.priceArs));
     const cleanExternal = this.iqrFilter(externalPrices, 1.5);
     const extMedian = this.median(cleanExternal);
     const extWeight = Math.min(cleanExternal.length / 10, 1);
@@ -142,13 +142,13 @@ export class PricingService {
     // Internal: exponential decay (recent trades weighted higher)
     let intWeighted = 0;
     if (internalTrades.length) {
-      const decayed = internalTrades.map((t) => {
+      const decayed = internalTrades.map((t: any) => {
         const ageDays =
           (Date.now() - t.completedAt.getTime()) / 86_400_000;
         const decay = Math.exp(-ageDays / 14); // 14-day half-life
         return Number(t.cashDeltaArs ?? 0) * decay;
       });
-      intWeighted = decayed.reduce((a, b) => a + b, 0) / internalTrades.length;
+      intWeighted = decayed.reduce((a: number, b: number) => a + b, 0) / internalTrades.length;
     }
     const intWeight = Math.min(internalTrades.length / 5, 1);
 

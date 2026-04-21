@@ -57,7 +57,7 @@ export class UsersService {
         cards: user._count.collectionItems,
         trades: user._count.initiatedTrades,
       },
-      topCards: user.collectionItems.map((ci) => ({
+      topCards: user.collectionItems.map((ci: any) => ({
         name: ci.card.name,
         rarity: ci.card.rarity,
         setName: ci.card.setName,
@@ -145,7 +145,7 @@ export class UsersService {
       take: 50,
     });
 
-    const totalScore = events.reduce((sum, e) => sum + e.delta, 0);
+    const totalScore = events.reduce((sum: number, e: any) => sum + e.delta, 0);
     return { totalScore, events };
   }
 

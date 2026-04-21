@@ -100,8 +100,8 @@ export class TradesService {
       }),
     ]);
 
-    const wishlistCardIds = wishlistCards.map((w) => w.cardId);
-    const forTradeCardIds = forTradeItems.map((f) => f.cardId);
+    const wishlistCardIds = wishlistCards.map((w: any) => w.cardId);
+    const forTradeCardIds = forTradeItems.map((f: any) => f.cardId);
 
     if (!wishlistCardIds.length || !forTradeCardIds.length) {
       return { matches: [], message: 'Add cards to your wishlist and mark duplicates for trade to see matches' };
@@ -357,7 +357,7 @@ export class TradesService {
   // ── Internal: complete trade ───────────────────────────────────────────────
 
   private async completeTrade(offer: any, dto: ConfirmTradeDto) {
-    const trade = await this.prisma.$transaction(async (tx) => {
+    const trade = await this.prisma.$transaction(async (tx: any) => {
       // Mark offer completed
       await tx.tradeOffer.update({
         where: { id: offer.id },
@@ -490,7 +490,7 @@ export class TradesService {
         distinct: ['cardId'],
         select: { cardId: true, priceArs: true },
       });
-      return snapshots.reduce((sum, s) => sum + Number(s.priceArs), 0);
+      return snapshots.reduce((sum: number, s: any) => sum + Number(s.priceArs), 0);
     };
 
     const [offeredValue, requestedValue] = await Promise.all([
