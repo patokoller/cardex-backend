@@ -339,9 +339,10 @@ export class TradesService {
       : 'confirmed_counterpart';
 
     // Check if other party already confirmed
+    const offerStatus = offer.status as string;
     const bothConfirmed =
-      (isInitiator && offer.status === 'confirmed_counterpart') ||
-      (!isInitiator && offer.status === 'confirmed_initiator');
+      (isInitiator && offerStatus === 'confirmed_counterpart') ||
+      (!isInitiator && offerStatus === 'confirmed_initiator');
 
     if (bothConfirmed) {
       // Both confirmed — complete the trade
