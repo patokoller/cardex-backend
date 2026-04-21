@@ -1,3 +1,9 @@
+[phases.setup]
+nixPkgs = ["nodejs-18_x", "openssl"]
+
+[phases.install]
+cmds = ["npm ci"]
+
 [phases.build]
 cmds = [
   "npx prisma generate",
