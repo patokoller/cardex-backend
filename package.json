@@ -19,7 +19,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
-    "build:nest": "nest build"
+    "build:nest": "tsc -p tsconfig.build.json"
   },
   "dependencies": {
     "@nestjs/common": "^10.3.0",
