@@ -3,6 +3,6 @@ builder = "NIXPACKS"
 buildCommand = "echo 'Cache bust v6' && npx prisma generate && ./node_modules/.bin/tsc -p tsconfig.build.json 2>&1 || true"
 
 [deploy]
-startCommand = "node dist/main"
+startCommand = "npx prisma migrate deploy && node dist/main"
 restartPolicyType = "ON_FAILURE"
 restartPolicyMaxRetries = 3
